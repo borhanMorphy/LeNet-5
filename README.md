@@ -1,8 +1,8 @@
-# TITLE 
+## TITLE 
 Tensorflow implementation of LeNet-5 structure
 
-# MODEL
+## MODEL
 ![Model](LeNet-5.jpg)
 
-# REFERENCE
+## REFERENCE
 [Related Paper Link](http://yann.lecun.com/exdb/publis/pdf/lecun-98.pdf)
