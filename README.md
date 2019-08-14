@@ -1,5 +1,5 @@
 ## TITLE 
-Tensorflow implementation of LeNet-5 structure
+Tensorflow implementation of LeNet-5 architecture
 
 ## MODEL
 ![Model](LeNet-5.jpg)

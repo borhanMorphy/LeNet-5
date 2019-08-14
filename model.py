@@ -3,6 +3,14 @@ import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 import time
 
+## TODO
+# - add args
+# - use tf.data to fetch inputs
+# - add import functionality
+# - add export functionality
+# - add detailed accuracy log
+# - split forward & backward operations
+
 class LeNet5():
     def __init__(self):
         # configs for run time session
@@ -15,10 +23,10 @@ class LeNet5():
         self.graph = tf.Graph()
 
         # define input layer
-        self.X = self.__input_layer()
+        X = self.__input_layer()
 
         # define layer 1 (convolutional layer)
-        C1 = self.__layer1(self.X)
+        C1 = self.__layer1(X)
 
         # define layer 2 (average pooling layer)
         S1 = self.__layer2(C1)
@@ -38,13 +46,24 @@ class LeNet5():
         # define output layer (fully connected layer)
         FC2 = self.__output_layer(FC1)
 
-        self.Z = FC2
+        # define backprop
+        self.__backprop_operations()
+        
+        with self.graph.as_default():
+            self.saver = tf.train.Saver()
+
+    @staticmethod
+    def generate_variables(shape,name,zeros=False):
+        if zeros:
+            return tf.Variable(tf.zeros(shape), name=name)
+        return tf.Variable(tf.truncated_normal(shape=shape, mean = 0, stddev = 0.1), name=name)
 
     def __input_layer(self):
         with self.graph.as_default():
             return tf.placeholder(
                 shape=(None,32,32,1),
-                dtype=tf.float32
+                dtype=tf.float32,
+                name="input_layer"
             )
 
     def __layer1(self, X):
@@ -63,19 +82,10 @@ class LeNet5():
         """
         # TODO: check X dimentions
         with self.graph.as_default():
-            W = tf.Variable(
-                initial_value=np.random.rand(5,5,1,6),
-                dtype=tf.float32,
-                trainable=True,
-                name="C1_W"
-            )
-            B = tf.Variable(
-                initial_value=np.random.rand(1,6),
-                dtype=tf.float32,
-                trainable=True,
-                name="C1_B"
-            )
-            return tf.math.tanh( tf.nn.conv2d(X, W, strides=1, padding="VALID",name="conv1") + B , name="C1_tanh")
+            W = LeNet5.generate_variables(shape=(5,5,1,6), name="conv_layer_1_w")
+            B = LeNet5.generate_variables(shape=(1,6), name="conv_layer_1_b", zeros=True)
+
+            return tf.math.tanh( tf.nn.conv2d(X, W, strides=1, padding="VALID",name="conv_layer_1") + B , name="conv_layer_1_tanh")
 
                 
     def __layer2(self, X):
@@ -98,7 +108,7 @@ class LeNet5():
                 ksize=2,
                 strides=2,
                 padding="VALID",
-                name="samp1"
+                name="sample_layer_2"
             )
     
     def __layer3(self, X):
@@ -126,19 +136,9 @@ class LeNet5():
         # TODO: currently connected all but it will be fixed later as mentioned upward
         # TODO: check X dimentions
         with self.graph.as_default():
-            W = tf.Variable(
-                initial_value=np.random.rand(5,5,6,16),
-                dtype=tf.float32,
-                trainable=True,
-                name="C2_W"
-            )
-            B = tf.Variable(
-                initial_value=np.random.rand(1,16),
-                dtype=tf.float32,
-                trainable=True,
-                name="C2_B"
-            )
-            return tf.math.tanh( tf.nn.conv2d(X, W, strides=1, padding="VALID", name="conv2") + B , name="C2_tanh")
+            W = LeNet5.generate_variables(shape=(5,5,6,16), name="conv_layer_3_w")
+            B = LeNet5.generate_variables(shape=(1,16), name="conv_layer_3_b", zeros=True)
+            return tf.math.tanh( tf.nn.conv2d(X, W, strides=1, padding="VALID", name="conv_layer_3") + B , name="conv_layer_3_tanh")
 
     
     def __layer4(self, X):
@@ -161,7 +161,7 @@ class LeNet5():
                 ksize=2,
                 strides=2,
                 padding="VALID",
-                name="samp2"
+                name="sample_layer_4"
             )
 
     def __layer5(self, X):
@@ -180,19 +180,9 @@ class LeNet5():
         """
         # TODO: check X dimentions
         with self.graph.as_default():
-            W = tf.Variable(
-                initial_value=np.random.rand(5,5,16,120),
-                dtype=tf.float32,
-                trainable=True,
-                name="C3_W"
-            )
-            B = tf.Variable(
-                initial_value=np.random.rand(1,120),
-                dtype=tf.float32,
-                trainable=True,
-                name="C3_B"
-            )
-            return tf.math.tanh( tf.nn.conv2d(X, W, strides=1, padding="VALID", name="conv3") + B , name="C3_tanh")
+            W = LeNet5.generate_variables(shape=(5,5,16,120), name="conv_layer_5_w")
+            B = LeNet5.generate_variables(shape=(1,120), name="conv_layer_5_b", zeros=True)
+            return tf.math.tanh( tf.nn.conv2d(X, W, strides=1, padding="VALID", name="conv_layer_5") + B , name="conv_layer_5_tanh")
     
     def __layer6(self, X):
         """
@@ -210,21 +200,10 @@ class LeNet5():
         """
         # TODO: check X dimentions
         with self.graph.as_default():
-            W = tf.Variable(
-                initial_value=np.random.rand(120,84),
-                dtype=tf.float32,
-                trainable=True,
-                name="fc1_w"
-            )
-            B = tf.Variable(
-                initial_value=np.random.rand(1,84),
-                dtype=tf.float32,
-                trainable=True,
-                name="fc1_b"
-
-            )
-            # TODO: 128 is batch size change it to dynamic
-            return tf.math.tanh( tf.matmul(tf.reshape(X, (-1,120)), W) + B , name="fc1_tanh")
+            W = LeNet5.generate_variables(shape=(120,84), name="fc_layer_6_w")
+            B = LeNet5.generate_variables(shape=(1,84), name="fc_layer_6_b", zeros=True)
+            
+            return tf.math.tanh( tf.matmul(tf.reshape(X, (-1,120)), W) + B , name="fc_layer_6_tanh")
     
     def __output_layer(self, X):
         """
@@ -242,19 +221,35 @@ class LeNet5():
         """
         # TODO: check X dimentions
         with self.graph.as_default():
-            W = tf.Variable(
-                initial_value=np.random.rand(84,10),
-                dtype=tf.float32,
-                trainable=True,
-                name="fc2_w"
-            )
-            B = tf.Variable(
-                initial_value=np.random.rand(1,10),
-                dtype=tf.float32,
-                trainable=True,
-                name="fc2_b"
-            )
-            return tf.matmul(X, W) + B
+            W = LeNet5.generate_variables(shape=(84,10), name="output_layer_w")
+            B = LeNet5.generate_variables(shape=(1,10), name="output_layer_b", zeros=True)
+            return tf.add(tf.matmul(X, W),B, name="output_layer")
+
+    def __backprop_operations(self, num_of_classes=10, learning_rate=0.001):# TODO add num_of_classes
+        with self.graph.as_default():
+            # define Y tensor for actual results
+            Y = tf.placeholder(shape=(None,num_of_classes), dtype=tf.float32, name="Y_TRUE")
+
+            # define loss
+            logits = self.graph.get_tensor_by_name("output_layer:0")
+            loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=Y, logits=logits, name="loss")
+            
+            # define cost
+            cost = tf.reduce_mean(loss,name="cost")
+
+            # define optimizer
+            optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+
+            # minimize cost
+            optimizer.minimize(cost, name="train")
+
+            # define accuracy metrics
+            matches = tf.equal(tf.argmax(logits,1),tf.argmax(Y,1))
+            tf.reduce_mean(tf.cast(matches,tf.float32), name="accuracy")
+
+    def __evaluate(self, X_data, Y_data):
+        pass
+        
 
     @staticmethod
     def train_test_split(X, Y, train_portion):
@@ -288,32 +283,17 @@ class LeNet5():
 
         X_train = X_train.reshape(train_size,32,32,1)
         X_test = X_test.reshape(test_size,32,32,1)
+
         # forward and backward prop
-        with self.graph.as_default():
-
-            # define Y true values
-            Y = tf.placeholder(shape=(None,num_of_classes), dtype=tf.float32)
-
-            # define loss
-            loss = tf.nn.softmax_cross_entropy_with_logits_v2(
-                labels=Y,           # real values of Y
-                logits=self.Z,      # estimated values of Y
-                name="cross_loss"
-            )
-
-            # define cost
-            cost = tf.reduce_mean(loss)
-
-            # define optimizer
-            optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-
-            # minimize cost descent
-            gradient = optimizer.minimize(cost)
-
-            # initialize graph variables
-            init = tf.global_variables_initializer()
         
         with tf.Session(graph=self.graph, config=self.configProto) as sess:
+            # initialize graph variables
+            init = tf.global_variables_initializer()
+            gradient = self.graph.get_operation_by_name("train")
+            cost = self.graph.get_tensor_by_name("cost:0")
+            acc = self.graph.get_tensor_by_name("accuracy:0")
+            X = self.graph.get_tensor_by_name("input_layer:0")
+            Y = self.graph.get_tensor_by_name("Y_TRUE:0")
             print("session started...")
 
             # initialize data
@@ -322,32 +302,25 @@ class LeNet5():
             for offset in range(0,train_size-batch_size,batch_size):
 
                 # forward-backward prop
-                sess.run(gradient, feed_dict={self.X: X_train[offset:offset+batch_size] , Y:Y_train[offset:offset+batch_size]})
-
+                sess.run(gradient, feed_dict={X: X_train[offset:offset+batch_size] , Y:Y_train[offset:offset+batch_size]})
                 if offset % 10 == 0:
                     # calculate cost
                     cost_value = sess.run(cost, 
                         feed_dict={
-                            self.X  :X_test,
-                            Y       :Y_test
+                            X  :X_test,
+                            Y  :Y_test
                         }
                     )
-                    print("cost: ",cost_value,"\n")
+                    
+                    accuracy_value = sess.run(acc,
+                        feed_dict={
+                            Y  : Y_test,
+                            X  : X_test
+                        }
+                    )
+                    print("accuracy: ",accuracy_value)
                 time.sleep(0.1)
-
-    def forward(self, op, data):
-        # feed forward
-        with self.graph.as_default():
-            # prepare data
-            data = data.reshape(1,32,32,1)
-            init = tf.global_variables_initializer()
-            with tf.Session() as sess:
-                # initialize data
-                sess.run(init)
-
-                # feed forward
-                result = sess.run(op,feed_dict={self.X:data})
-        return result
+            self.saver.save(sess,"lenet")
 
 if __name__ == '__main__':
     # create the lenet-5 model
@@ -361,7 +334,7 @@ if __name__ == '__main__':
     # convert 28x28 images to 32x32 images since LeNet-5 designed to handle 32x32 gray scale images
     image_data = np.pad(image_data.reshape(image_data.shape[0],28,28),((0,0),(2,2),(2,2)),"constant").reshape(image_data.shape[0],1024)
     
-    model.train(data=(image_data,label_data), epoch=1)
+    model.train(data=(image_data,label_data), epoch=1, learning_rate=0.01, batch_size=512)
 
     
 
