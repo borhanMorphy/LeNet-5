@@ -10,9 +10,11 @@ import argparse
 # - split forward & backward operations
 
 class LeNet5():
-    def __init__(self, model_path:str, core_count:int=1):
+    def __init__(self, model_path:str, core_count:int=1, pre_trained_model_path:str=None):
         # TODO: apply accepted range as dynamicly
         assert core_count > 0 and core_count <= 8
+
+        self.pre_trained_model_path =  pre_trained_model_path
 
         # configs for run time session
         self.configProto = tf.ConfigProto(
@@ -51,7 +53,7 @@ class LeNet5():
         self.__backprop_operations()
         
         with self.graph.as_default():
-            self.saver = tf.train.Saver()
+            self.saver = tf.train.Saver(max_to_keep=1)
 
     @staticmethod
     def generate_variables(shape,name,zeros=False):
@@ -264,7 +266,7 @@ class LeNet5():
         verbose2 = "Test:\ncost: {:.3f}\taccuracy: {:.3f}\n".format(test_stats[0],test_stats[1])
         verbose3 = "Train:\ncost: {:.3f}\taccuracy: {:.3f}\n".format(train_stats[0],train_stats[1])
         wrapper = "_______________________________________\n"
-        return wrapper+verbose1+verbose2+verbose3+wrapper
+        return wrapper+verbose1+verbose2+verbose3+wrapper,test_stats[0],test_stats[1]
 
     @staticmethod
     def train_test_split(X, Y, train_portion):
@@ -306,16 +308,21 @@ class LeNet5():
         
         with tf.Session(graph=self.graph, config=self.configProto) as sess:
             # initialize graph variables
-            init = tf.global_variables_initializer()
+            if self.pre_trained_model_path:
+                self.saver.restore(sess, self.pre_trained_model_path)
+            else:
+                init = tf.global_variables_initializer()
+                # initialize data
+                sess.run(init)
+            
             gradient = self.graph.get_operation_by_name("train")
             cost = self.graph.get_tensor_by_name("cost:0")
             acc = self.graph.get_tensor_by_name("accuracy:0")
             X = self.graph.get_tensor_by_name("input_layer:0")
             Y = self.graph.get_tensor_by_name("Y_TRUE:0")
+            best_acc = 0
             print("session started...")
 
-            # initialize data
-            sess.run(init)
             for i in range(epoch):
                 # shuffle the train set for every epoch
                 randomize = np.arange(train_size)
@@ -329,15 +336,18 @@ class LeNet5():
                     # forward-backward prop
                     sess.run(gradient, feed_dict={X: X_train[offset:offset+batch_size] , Y:Y_train[offset:offset+batch_size]})
                     if offset % 10 == 0:
-                        verbose = self.__evaluate(
+                        verbose,cost,acc = self.__evaluate(
                             X_train[offset:offset+batch_size],Y_train[offset:offset+batch_size],
                             X_test,Y_test,
                             (i+1,epoch),
                             (offset+batch_size,train_size)
                         )
                         print(verbose)
-                    
-                self.saver.save(sess,"lenet")
+                        if acc > best_acc:
+                            best_acc = acc
+                            print("saving model with accuracy: ",best_acc)
+                            self.saver.save(sess,"models/lenet", global_step=None)    
+                
 
 def get_args():
     """
@@ -373,7 +383,7 @@ if __name__ == '__main__':
     args = get_args()
 
     # create the lenet-5 model
-    model = LeNet5(model_path=args.load_model, core_count=args.cores)
+    model = LeNet5(model_path=args.load_model, core_count=args.cores, pre_trained_model_path=args.load_model)
 
     # download the mnist data
     mnist = input_data.read_data_sets("data/", one_hot=True)
