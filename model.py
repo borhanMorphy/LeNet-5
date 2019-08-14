@@ -1,21 +1,23 @@
 import tensorflow.compat.v1 as tf
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
-import time
+import argparse
 
 ## TODO
-# - add args
 # - use tf.data to fetch inputs
 # - add import functionality
 # - add export functionality
 # - split forward & backward operations
 
 class LeNet5():
-    def __init__(self):
+    def __init__(self, model_path:str, core_count:int=1):
+        # TODO: apply accepted range as dynamicly
+        assert core_count > 0 and core_count <= 8
+
         # configs for run time session
         self.configProto = tf.ConfigProto(
-            intra_op_parallelism_threads=4,
-            inter_op_parallelism_threads=4
+            intra_op_parallelism_threads=core_count,
+            inter_op_parallelism_threads=core_count
         )
 
         # initialize the computation graph
@@ -279,7 +281,7 @@ class LeNet5():
         return X[:break_point], Y[:break_point], X[break_point:], Y[break_point:]
 
 
-    def train(self, data, train_portion=0.8, batch_size=128, learning_rate=0.001, epoch=4):
+    def train(self, data, train_portion:int=80, batch_size:int=128, learning_rate:float=0.001, epoch:int=4, save_bestof:int=3):
         """
             data as tuple with format of:
             (
@@ -287,7 +289,10 @@ class LeNet5():
                 (data_set_size,10)    # labels as numpy ndarray
             )
         """
-        X_train,Y_train,X_test,Y_test = LeNet5.train_test_split(data[0],data[1],train_portion)
+        assert train_portion > 0 and train_portion < 100
+
+
+        X_train,Y_train,X_test,Y_test = LeNet5.train_test_split(data[0],data[1],train_portion/100.0)
         del data
         
         num_of_classes = Y_train.shape[1]
@@ -331,12 +336,44 @@ class LeNet5():
                             (offset+batch_size,train_size)
                         )
                         print(verbose)
-                    time.sleep(0.1)
+                    
                 self.saver.save(sess,"lenet")
 
+def get_args():
+    """
+        --mode train/test/deploy
+        --cores 1/2/3/4/5/6/7/8
+        --load_model <path_to_model>
+        
+        ### only for train mode ###
+        --save_bestof 1/2/3/4/5/6
+        --batch_size 
+        --epochs
+        --learning_rate
+        ###########################
+    """
+    parser = argparse.ArgumentParser(description='LeNet-5 model generator/runner')
+    parser.add_argument('-m','--mode', help='choose between train/test/deploy', required=True)
+    parser.add_argument('-c','--cores', help='select core count to use, default is 1', type=int, default=1)
+    parser.add_argument('-lm','--load_model', help='path to pre-trained model')
+
+    parser.add_argument('-sb','--save_bestof', help='selected number will be used for saving best of <count> models while training, default is 3',type=int, default=3)
+    parser.add_argument('-b','--batch_size', help='batch size for traing, default is 128', type=int, default=128)
+    parser.add_argument('-e','--epoch', help='epoch size, default is 10',type=int, default=10)
+    parser.add_argument('-lr','--learning_rate', help='learning rate for the model, default is 0.001',type=float, default=0.001)
+    parser.add_argument('-tp','--traning_percent', help='give a percentage between 0-100 to split train/test data, default is 80',type=int, default=80)
+
+
+    return parser.parse_args()
+
+
+
 if __name__ == '__main__':
+    # get args
+    args = get_args()
+
     # create the lenet-5 model
-    model = LeNet5()
+    model = LeNet5(model_path=args.load_model, core_count=args.cores)
 
     # download the mnist data
     mnist = input_data.read_data_sets("data/", one_hot=True)
@@ -346,7 +383,12 @@ if __name__ == '__main__':
     # convert 28x28 images to 32x32 images since LeNet-5 designed to handle 32x32 gray scale images
     image_data = np.pad(image_data.reshape(image_data.shape[0],28,28),((0,0),(2,2),(2,2)),"constant").reshape(image_data.shape[0],1024)
     
-    model.train(data=(image_data,label_data), epoch=4, learning_rate=0.01, batch_size=512)
+    model.train(
+        data=(image_data,label_data), 
+        epoch=args.epoch, learning_rate=args.learning_rate, 
+        batch_size=args.batch_size, train_portion=args.traning_percent, 
+        save_bestof=args.save_bestof
+    )
 
     
 
