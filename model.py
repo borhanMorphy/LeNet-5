@@ -281,7 +281,7 @@ class LeNet5():
         return X[:break_point], Y[:break_point], X[break_point:], Y[break_point:]
 
 
-    def train(self, data, train_portion:int=80, batch_size:int=128, learning_rate:float=0.001, epoch:int=4, save_bestof:int=3):
+    def train(self, data, train_portion:int=80, batch_size:int=128, learning_rate:float=0.001, epoch:int=4, save_top:int=3):
         """
             data as tuple with format of:
             (
@@ -346,7 +346,7 @@ def get_args():
         --load_model <path_to_model>
         
         ### only for train mode ###
-        --save_bestof 1/2/3/4/5/6
+        --save_top 1/2/3/4/5/6
         --batch_size 
         --epochs
         --learning_rate
@@ -357,7 +357,7 @@ def get_args():
     parser.add_argument('-c','--cores', help='select core count to use, default is 1', type=int, default=1)
     parser.add_argument('-lm','--load_model', help='path to pre-trained model')
 
-    parser.add_argument('-sb','--save_bestof', help='selected number will be used for saving best of <count> models while training, default is 3',type=int, default=3)
+    parser.add_argument('-sb','--save_top', help='selected number will be used for saving top <count> models while training, default is 3',type=int, default=3)
     parser.add_argument('-b','--batch_size', help='batch size for traing, default is 128', type=int, default=128)
     parser.add_argument('-e','--epoch', help='epoch size, default is 10',type=int, default=10)
     parser.add_argument('-lr','--learning_rate', help='learning rate for the model, default is 0.001',type=float, default=0.001)
@@ -387,7 +387,7 @@ if __name__ == '__main__':
         data=(image_data,label_data), 
         epoch=args.epoch, learning_rate=args.learning_rate, 
         batch_size=args.batch_size, train_portion=args.traning_percent, 
-        save_bestof=args.save_bestof
+        save_top=args.save_top
     )
 
     
