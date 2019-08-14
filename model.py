@@ -8,7 +8,6 @@ import time
 # - use tf.data to fetch inputs
 # - add import functionality
 # - add export functionality
-# - add detailed accuracy log
 # - split forward & backward operations
 
 class LeNet5():
@@ -247,9 +246,23 @@ class LeNet5():
             matches = tf.equal(tf.argmax(logits,1),tf.argmax(Y,1))
             tf.reduce_mean(tf.cast(matches,tf.float32), name="accuracy")
 
-    def __evaluate(self, X_data, Y_data):
-        pass
+    def __evaluate(self, X_train, Y_train, X_test, Y_test, epoch, iteration):
+        sess = tf.get_default_session()
+        X = sess.graph.get_tensor_by_name("input_layer:0")
+        Y = sess.graph.get_tensor_by_name("Y_TRUE:0")
+        cost = sess.graph.get_tensor_by_name("cost:0")
+        acc = sess.graph.get_tensor_by_name("accuracy:0")
+
+        # evaluate
+        test_stats = sess.run((cost,acc), feed_dict={X:X_test, Y:Y_test} )
+
+        train_stats = sess.run((cost,acc), feed_dict={X:X_train, Y:Y_train} )
         
+        verbose1 = "EPOCH: {}/{}\tIteration: {}/{}\n".format(epoch[0],epoch[1],iteration[0],iteration[1])
+        verbose2 = "Test:\ncost: {:.3f}\taccuracy: {:.3f}\n".format(test_stats[0],test_stats[1])
+        verbose3 = "Train:\ncost: {:.3f}\taccuracy: {:.3f}\n".format(train_stats[0],train_stats[1])
+        wrapper = "_______________________________________\n"
+        return wrapper+verbose1+verbose2+verbose3+wrapper
 
     @staticmethod
     def train_test_split(X, Y, train_portion):
@@ -266,7 +279,7 @@ class LeNet5():
         return X[:break_point], Y[:break_point], X[break_point:], Y[break_point:]
 
 
-    def train(self, data, train_portion=0.8, batch_size=128, learning_rate=0.001, epoch=1000):
+    def train(self, data, train_portion=0.8, batch_size=128, learning_rate=0.001, epoch=4):
         """
             data as tuple with format of:
             (
@@ -298,29 +311,28 @@ class LeNet5():
 
             # initialize data
             sess.run(init)
+            for i in range(epoch):
+                # shuffle the train set for every epoch
+                randomize = np.arange(train_size)
+                np.random.shuffle(randomize)
 
-            for offset in range(0,train_size-batch_size,batch_size):
+                X_train = X_train[randomize]
+                Y_train = Y_train[randomize]
 
-                # forward-backward prop
-                sess.run(gradient, feed_dict={X: X_train[offset:offset+batch_size] , Y:Y_train[offset:offset+batch_size]})
-                if offset % 10 == 0:
-                    # calculate cost
-                    cost_value = sess.run(cost, 
-                        feed_dict={
-                            X  :X_test,
-                            Y  :Y_test
-                        }
-                    )
-                    
-                    accuracy_value = sess.run(acc,
-                        feed_dict={
-                            Y  : Y_test,
-                            X  : X_test
-                        }
-                    )
-                    print("accuracy: ",accuracy_value)
-                time.sleep(0.1)
-            self.saver.save(sess,"lenet")
+                for offset in range(0,train_size-batch_size,batch_size):
+
+                    # forward-backward prop
+                    sess.run(gradient, feed_dict={X: X_train[offset:offset+batch_size] , Y:Y_train[offset:offset+batch_size]})
+                    if offset % 10 == 0:
+                        verbose = self.__evaluate(
+                            X_train[offset:offset+batch_size],Y_train[offset:offset+batch_size],
+                            X_test,Y_test,
+                            (i+1,epoch),
+                            (offset+batch_size,train_size)
+                        )
+                        print(verbose)
+                    time.sleep(0.1)
+                self.saver.save(sess,"lenet")
 
 if __name__ == '__main__':
     # create the lenet-5 model
@@ -334,7 +346,7 @@ if __name__ == '__main__':
     # convert 28x28 images to 32x32 images since LeNet-5 designed to handle 32x32 gray scale images
     image_data = np.pad(image_data.reshape(image_data.shape[0],28,28),((0,0),(2,2),(2,2)),"constant").reshape(image_data.shape[0],1024)
     
-    model.train(data=(image_data,label_data), epoch=1, learning_rate=0.01, batch_size=512)
+    model.train(data=(image_data,label_data), epoch=4, learning_rate=0.01, batch_size=512)
 
     
 
